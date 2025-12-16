@@ -1,4 +1,36 @@
+/* eslint-disable @typescript-eslint/no-this-alias */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
+export interface VEB_JSON {
+  shift: number;
+  lo_mask: number;
+  clusterEntries: [number, VEB_JSON][] | null;
+  summary: VEB_JSON | null;
+  min: number;
+  max: number;
+  size: number;
+}
+
 export class VEB {
+  static fromJSON(serialized: VEB_JSON): VEB {
+    const veb = new VEB(0);
+    veb.shift = serialized.shift;
+    veb.lo_mask = serialized.lo_mask;
+    veb.min = serialized.min;
+    veb.max = serialized.max;
+    veb._size = serialized.size;
+    if (serialized.summary) {
+      veb.summary = VEB.fromJSON(serialized.summary);
+    }
+    if (serialized.clusterEntries) {
+      for (const [key, cluster] of serialized.clusterEntries) {
+        veb.clusters[key] = VEB.fromJSON(cluster);
+      }
+    }
+
+    return veb;
+  }
+
   private shift: number;
   private lo_mask: number;
   private clusters: Record<number, VEB>;
@@ -7,7 +39,7 @@ export class VEB {
   private max = -1;
   private _size = 0;
   
-  constructor(public readonly bound: number) {
+  constructor(bound: number) {
     const shift = Math.floor(Math.log2(bound)/2);
     this.shift = shift;
     
@@ -205,5 +237,25 @@ export class VEB {
 
   public [Symbol.iterator]() {
     return this.keys();
+  }
+
+  toJSON(): VEB_JSON {
+    const clusterEntries: [number, VEB_JSON][] = [];
+    for (const [key, veb] of Object.entries(this.clusters)) {
+      clusterEntries.push([Number(key), veb.toJSON()]);
+    }
+
+    const vebJSON: VEB_JSON = {
+      shift: this.shift,
+      lo_mask: this.lo_mask,
+      clusterEntries: null,
+      summary: this.summary?.toJSON() ?? null,
+      min: this.min,
+      max: this.max,
+      size: this.size
+    };
+    if (clusterEntries.length > 0)
+      vebJSON.clusterEntries = clusterEntries;
+    return vebJSON;
   }
 }
